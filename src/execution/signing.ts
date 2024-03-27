@@ -5,6 +5,7 @@ import { parseEther } from "@ethersproject/units";
 import { isHexString } from "ethers/lib/utils";
 import { SafeTxProposal } from "./proposing";
 import { proposalFile, signaturesFile, readFromCliCache, writeToCliCache, loadSignatures } from "./utils";
+import { signerv6 } from "../signer-v6";
 
 task("sign-tx", "Signs a Safe transaction")
     .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
@@ -47,7 +48,8 @@ task("sign-proposal", "Signs a Safe transaction")
         if (owners.indexOf(signer.address) < 0) {
             throw Error(`Signer is not an owner of the Safe. Owners: ${owners}`)
         }
-        const signature = await signHash(signer, taskArgs.hash)
+        // @ts-ignore
+        const signature = await signHash(signerv6, taskArgs.hash)
         await updateSignatureFile(taskArgs.hash, signature)
         console.log(`Signature: ${signature.data}`)
     });

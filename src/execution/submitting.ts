@@ -7,6 +7,8 @@ import { getAddress } from "@ethersproject/address";
 import { isHexString } from "ethers/lib/utils";
 import { SafeTxProposal } from "./proposing";
 import { loadSignatures, proposalFile, readFromCliCache } from "./utils";
+import { providerv6, signerv6 } from "../signer-v6";
+import { ethers6 } from "ethers6-proxied";
 
 const parsePreApprovedConfirmation = (data: string): SafeSignature => {
     const signer = getAddress("0x" + data.slice(26, 66))
@@ -138,7 +140,26 @@ task("submit-proposal", "Executes a Safe transaction")
             return
         }
         
-        const receipt = await signer.sendTransaction(populatedTx).then(tx => tx.wait())
-        console.log("Ethereum transaction hash:", receipt.transactionHash)
-        return receipt.transactionHash
+        const feeData = await providerv6.getFeeData();
+        const nonce = await signerv6.getNonce();
+        const transactionRequest: ethers6.TransactionRequest = {
+            to: populatedTx.to,
+            from: populatedTx.from,
+            data: populatedTx.data,
+            type: 2,
+            ...feeData,
+            nonce,
+            chainId: (await providerv6.getNetwork()).chainId,
+        };
+        const gasLimit = await signerv6.estimateGas(transactionRequest);
+        const signedData = await signerv6.signTransaction({
+            ...transactionRequest,
+            gasLimit,
+        });
+        const response = await providerv6.broadcastTransaction(signedData);
+        console.log(`Waiting for transaction ${response.hash}`);
+        const receipt = await providerv6.waitForTransaction(response.hash);
+
+        console.log("Ethereum transaction:", receipt)
+        return response.hash
     });

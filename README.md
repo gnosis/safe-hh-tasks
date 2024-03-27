@@ -1,4 +1,4 @@
-Gnosis Safe Tasks
+Gnosis Safe Tasks - Fluence Modification
 =================
 
 Install
@@ -8,10 +8,13 @@ Set correct node version (see `.nvmrc`) with [nvm](https://github.com/nvm-sh/nvm
 nvm use
 ```
 
-Install requirements with yarn:
+Install requirements with npm:
 ```bash
-yarn
+npm i
 ```
+Maybe you need to use --force flag  
+
+Do not use yarn for installing dependencies! It will use wrong version of ethers.js
 
 Quick Start
 -----------

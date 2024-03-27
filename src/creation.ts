@@ -4,6 +4,8 @@ import { getAddress } from "@ethersproject/address";
 import { buildMultiSendSafeTx, calculateProxyAddress, encodeMultiSend, MetaTransaction } from "@gnosis.pm/safe-contracts";
 import { safeSingleton, proxyFactory, safeL2Singleton, multiSendCallOnlyLib, compatHandler } from "./contracts";
 import { readCsv, writeJson, writeTxBuilderJson } from "./execution/utils";
+import { signerv6, providerv6 } from "./signer-v6";
+import { ethers6 } from "ethers6-proxied";
 
 const parseSigners = (rawSigners: string): string[] => {
     return rawSigners.split(",").map(address => getAddress(address))
@@ -33,9 +35,31 @@ task("create", "Create a Safe")
         console.log(`Setup data: ${setupData}`)
         console.log(`Nonce: ${taskArgs.nonce}`)
         console.log(`To (factory): ${factory.address}`)
-        console.log(`Data: ${factory.interface.encodeFunctionData("createProxyWithNonce", [singleton.address, setupData, taskArgs.nonce])}`)
-        if (!taskArgs.buildOnly)
-            await factory.createProxyWithNonce(singleton.address, setupData, taskArgs.nonce).then((tx: any) => tx.wait())
+        const data = factory.interface.encodeFunctionData("createProxyWithNonce", [singleton.address, setupData, taskArgs.nonce]);
+        console.log(`Data: ${data}`)
+        if (!taskArgs.buildOnly) {
+            const feeData = await providerv6.getFeeData();
+            const nonce = await signerv6.getNonce();
+            const transactionRequest: ethers6.TransactionRequest = {
+                value: 0,
+                to: factory.address,
+                data,
+                type: 2,
+                chainId: (await providerv6.getNetwork()).chainId,
+                ...feeData,
+                nonce,
+            };
+            const gasLimit = await signerv6.estimateGas(transactionRequest);
+            const signedEncodedTransaction = await signerv6.signTransaction({
+                ...transactionRequest,
+                gasLimit,
+            });
+            const response = await providerv6.broadcastTransaction(signedEncodedTransaction);
+            console.log(`Waiting for transaction ${response.hash}`);
+            const receipt = await providerv6.waitForTransaction(response.hash);
+            console.log("Ethereum transaction:", receipt)
+            // await factory.createProxyWithNonce(singleton.address, setupData, taskArgs.nonce, { type: 2 }).then((tx: any) => tx.wait())
+        }
         // TODO verify deployment
     });
 
